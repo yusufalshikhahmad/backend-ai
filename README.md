@@ -4,21 +4,33 @@
 
 **الحالة:** Stage 0 — Product/design groundwork. No app implementation yet.
 
-## Vision
-افهم → جرّب → اكتب كودًا → اختبر → اشرح → ابنِ مشروعًا → احصل على feedback.
+## Start building with Gemini
+**استخدم حزمة Gemini Build الجاهزة الموجودة في المستودع:**
+- [ابدأ من هنا — Gemini Build Kit](builder-kit/README.md)
+- [البرومبت الرئيسي الكامل](builder-kit/prompts/00-master-prompt.md)
+- [برومبت UX وتحليل المنتج](builder-kit/prompts/01-product-and-ux.md)
+- [برومبت Design System](builder-kit/prompts/02-design-system.md)
+- [برومبت Home المستوحاة من الصورة المرجعية](builder-kit/prompts/03-home-prompt-first.md)
+- [بقية برومبتات الشاشات والاختبار](builder-kit/prompts/)
 
-## UI direction
-Prompt-first experience inspired by the uploaded screenshot (layout inspiration only; no Gemini branding/assets copied). Dark-first premium engineering academy with restrained cyan/blue/violet, semantic tokens, whitespace, Arabic RTL, complete light theme and accessibility.
+**مهم:** أرفق لقطة الشاشة المرجعية بنفسك في Gemini Build، وأرفق ملفات SVG الموجودة أدناه. استخدم اللقطة لتكوين Home فقط، ولا تنسخ اسم Gemini أو شعاره أو هويته.
 
-### Screen concept mockups
+## Visual mockups — attach these to Gemini
 ![Home prompt-first](assets/mockups/home-prompt-first.svg)
 ![Dashboard](assets/mockups/dashboard.svg)
 ![Lesson and lab](assets/mockups/lesson-lab.svg)
+![Curriculum map](assets/mockups/course-map.svg)
+![Quiz and review](assets/mockups/quiz-review.svg)
+![Project workspace](assets/mockups/project-workspace.svg)
+![Design system board](assets/mockups/design-system-board.svg)
 
-### Concept diagrams
+## Concept diagrams
 ![Learning journey](assets/concepts/learning-path.svg)
 ![RAG playground](assets/concepts/rag-playground.svg)
 ![Agent tool loop](assets/concepts/agent-tool-loop.svg)
+
+## Vision
+افهم → جرّب → اكتب كودًا → اختبر → اشرح → ابنِ مشروعًا → احصل على feedback.
 
 ## Docs
 - [Product Vision](docs/01-product-vision.md)
@@ -32,7 +44,7 @@ Prompt-first experience inspired by the uploaded screenshot (layout inspiration 
 - [Reference screenshot analysis](docs/09-reference-analysis.md)
 - [Design system research & palette](docs/10-design-system-research.md)
 - [Screen-by-screen specification](docs/11-visual-screen-spec.md)
-- [Gemini Build Mode master prompt](docs/12-gemini-build-master-prompt.md)
+- [Gemini Build master prompt](docs/12-gemini-build-master-prompt.md)
 - [Expanded stage prompts](docs/13-stage-prompts-expanded.md)
 - [UI prompt library](docs/14-ui-prompt-library.md)
 - [Image asset briefs](docs/15-image-asset-briefs.md)

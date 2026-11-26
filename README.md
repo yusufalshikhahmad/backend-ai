@@ -2,7 +2,7 @@
 
 منصة تعليمية عربية/إنجليزية تحول منهج AI Backend Engineering — Python on Linux إلى رحلة تفاعلية ومبنية على المشاريع، بدل تجربة PDF وفيديوهات فقط.
 
-**الحالة:** Stage 0 — Product/design groundwork. No app implementation yet.
+**الحالة:** Prototype 0.1 / Pre-alpha — frontend application exists; build/test status not yet verified in this review.
 
 ## Start building with Gemini
 **استخدم حزمة Gemini Build الجاهزة الموجودة في المستودع:**

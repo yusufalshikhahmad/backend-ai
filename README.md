@@ -7,8 +7,10 @@
 ## الرؤية
 دورة تعلم متكررة: افهم → جرّب → اكتب كودًا → اختبر → اشرح → ابنِ مشروعًا → احصل على feedback.
 
-## المبدأ
-المنهج الأصلي هو مصدر المقررات، أهداف التعلم، المتطلبات السابقة والمشاريع. المنصة تحسّن طريقة التعلم ولا تستبدل المنهج. أي إضافات تعليمية أو هندسية يتم تمييزها.
+## Concept art (illustrative)
+![Learning journey](assets/concepts/learning-path.svg)
+![RAG learning playground](assets/concepts/rag-playground.svg)
+![Agent tool loop](assets/concepts/agent-tool-loop.svg)
 
 ## الوثائق
 - [Product Vision](docs/01-product-vision.md)

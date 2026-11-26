@@ -1,0 +1,143 @@
+@import "tailwindcss";
+
+:root,
+html.dark {
+  --color-canvas: #0B0D12;
+  --color-surface-1: #11151D;
+  --color-surface-2: #171D27;
+  --color-surface-3: #202938;
+  --color-border: #273242;
+  --color-border-strong: #33465C;
+  --color-text-primary: #F4F7FC;
+  --color-text-secondary: #B2BECE;
+  --color-text-muted: #8593A7;
+  --color-cyan: #36D6F4;
+  --color-blue: #4C8DFF;
+  --color-violet: #8C78FF;
+  --color-action-primary: #36D6F4;
+  --color-action-primary-fg: #07111D;
+  --color-accent-text: #67E8F9;
+  --color-success: #42C98A;
+  --color-success-bg: rgba(66, 201, 138, 0.12);
+  --color-warning: #F3B65C;
+  --color-warning-bg: rgba(243, 182, 92, 0.12);
+  --color-error: #FF6B78;
+  --color-error-bg: rgba(255, 107, 120, 0.12);
+  --color-info: #69B7FF;
+  --color-info-bg: rgba(105, 183, 255, 0.12);
+  --color-focus-ring: #36D6F4;
+  --composer-glow: 0 0 0 1px rgba(54, 214, 244, 0.18), 0 20px 50px -20px rgba(76, 141, 255, 0.25);
+  --grid-line: rgba(39, 50, 66, 0.35);
+}
+
+html.light {
+  --color-canvas: #F5F7FB;
+  --color-surface-1: #FFFFFF;
+  --color-surface-2: #EDF1F7;
+  --color-surface-3: #E3EAF4;
+  --color-border: #D5DDE8;
+  --color-border-strong: #B4C2D4;
+  --color-text-primary: #111827;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748B;
+  --color-cyan: #0284C7;
+  --color-blue: #2563EB;
+  --color-violet: #6D28D9;
+  --color-action-primary: #0369A1;
+  --color-action-primary-fg: #FFFFFF;
+  --color-accent-text: #0369A1;
+  --color-success: #15803D;
+  --color-success-bg: rgba(21, 128, 61, 0.1);
+  --color-warning: #B45309;
+  --color-warning-bg: rgba(180, 83, 9, 0.1);
+  --color-error: #B91C1C;
+  --color-error-bg: rgba(185, 28, 28, 0.1);
+  --color-info: #1D4ED8;
+  --color-info-bg: rgba(29, 78, 216, 0.1);
+  --color-focus-ring: #0369A1;
+  --composer-glow: 0 0 0 1px rgba(37, 99, 235, 0.14), 0 18px 40px -20px rgba(15, 23, 42, 0.14);
+  --grid-line: rgba(180, 194, 212, 0.35);
+}
+
+@layer base {
+  html {
+    background-color: var(--color-canvas);
+    color: var(--color-text-primary);
+    font-family: "IBM Plex Sans Arabic", "Inter", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--color-canvas);
+    color: var(--color-text-primary);
+    line-height: 1.65;
+  }
+
+  code, pre, kbd, samp, .font-mono {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.ltr-isolate {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.academy-grid-bg {
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: 80px 80px;
+}
+
+.gradient-border-composer {
+  position: relative;
+  background: var(--color-surface-1);
+  border-radius: 24px;
+  box-shadow: var(--composer-glow);
+}
+
+.gradient-border-composer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1.5px;
+  border-radius: 24px;
+  background: linear-gradient(120deg, var(--color-cyan), var(--color-blue) 55%, var(--color-violet));
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.brand-gradient-bg {
+  background: linear-gradient(120deg, var(--color-cyan), var(--color-blue) 55%, var(--color-violet));
+}
+
+html.reduced-motion *,
+html.reduced-motion *::before,
+html.reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

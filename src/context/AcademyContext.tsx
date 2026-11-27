@@ -22,11 +22,17 @@ interface AcademyContextValue {
   learner: LearnerState;
   markBlockCompleted: (lessonSlug: string, blockId: string) => void;
   setLastLessonBlock: (lessonSlug: string, index: number) => void;
-  recordAttempt: (questionId: string, correctness: 'correct' | 'partial' | 'incorrect', hintCount: number) => AttemptRecord;
+  recordAttempt: (
+    questionId: string,
+    correctness: 'correct' | 'partial' | 'incorrect',
+    hintCount: number,
+    assessmentMode?: 'objective' | 'self_rubric'
+  ) => AttemptRecord;
   markLabCompleted: (labSlug: string) => void;
   saveReflection: (lessonSlug: string, text: string) => void;
   updateProjectProgress: (projectSlug: string, updater: (prev: ProjectProgress) => ProjectProgress) => void;
   loadDemoReviewItems: () => void;
+  clearDemoReviewItems: () => void;
   resetAllProgress: () => void;
 }
 
@@ -106,6 +112,27 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
+  useEffect(() => {
+    const base = 'AI Engineering Academy';
+    if (route === '/' || route === '') {
+      document.title = lang === 'ar' ? `${base} — منصة تعليم هندسة الذكاء الاصطناعي` : base;
+    } else if (route.startsWith('/learn') || route.startsWith('/course/')) {
+      document.title = lang === 'ar' ? `خريطة المنهج | ${base}` : `Curriculum Map | ${base}`;
+    } else if (route.startsWith('/lesson/')) {
+      document.title = lang === 'ar' ? `الدرس التفاعلي | ${base}` : `Lesson Player | ${base}`;
+    } else if (route.startsWith('/lab/')) {
+      document.title = lang === 'ar' ? `المختبر التفاعلي | ${base}` : `Interactive Lab | ${base}`;
+    } else if (route.startsWith('/review')) {
+      document.title = lang === 'ar' ? `المراجعة ونقاط التحقق | ${base}` : `Checkpoints & Review | ${base}`;
+    } else if (route.startsWith('/projects')) {
+      document.title = lang === 'ar' ? `المشاريع الهندسية | ${base}` : `Projects | ${base}`;
+    } else if (route.startsWith('/dashboard')) {
+      document.title = lang === 'ar' ? `لوحة التعلم | ${base}` : `Dashboard | ${base}`;
+    } else if (route.startsWith('/profile')) {
+      document.title = lang === 'ar' ? `الإعدادات | ${base}` : `Settings | ${base}`;
+    }
+  }, [route, lang]);
+
   const navigate = useCallback((to: string) => {
     if (to === route) {
       window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
@@ -155,11 +182,18 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const recordAttempt = useCallback((
     questionId: string,
     correctness: 'correct' | 'partial' | 'incorrect',
-    hintCount: number
+    hintCount: number,
+    assessmentMode: 'objective' | 'self_rubric' = 'objective'
   ): AttemptRecord => {
     let created!: AttemptRecord;
     updateLearner((prev) => {
-      created = computeNextAttempt(questionId, correctness, hintCount, prev.attempts[questionId]);
+      created = computeNextAttempt(
+        questionId,
+        correctness,
+        hintCount,
+        prev.attempts[questionId],
+        assessmentMode
+      );
       return {
         ...prev,
         attempts: {
@@ -222,6 +256,7 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         'q-aib100-relative-absolute': prev.attempts['q-aib100-relative-absolute'] ?? {
           questionId: 'q-aib100-relative-absolute',
           correctness: 'incorrect',
+          assessmentMode: 'objective',
           hintCount: 1,
           timestamp: now - 3600 * 1000,
           nextReviewAt: now - 1000,
@@ -231,6 +266,7 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         'q-aib100-project-scaffold-order': prev.attempts['q-aib100-project-scaffold-order'] ?? {
           questionId: 'q-aib100-project-scaffold-order',
           correctness: 'partial',
+          assessmentMode: 'objective',
           hintCount: 1,
           timestamp: now - 7200 * 1000,
           nextReviewAt: now - 500,
@@ -241,9 +277,23 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }));
   }, [updateLearner]);
 
+  const clearDemoReviewItems = useCallback(() => {
+    updateLearner((prev) => {
+      const nextAttempts: LearnerState['attempts'] = {};
+      for (const [k, v] of Object.entries(prev.attempts)) {
+        if (!v.isDemo) nextAttempts[k] = v;
+      }
+      return {
+        ...prev,
+        demoReviewLoaded: false,
+        attempts: nextAttempts,
+      };
+    });
+  }, [updateLearner]);
+
   const resetAllProgress = useCallback(() => {
     clearLearnerState();
-    setLearner(DEFAULT_LEARNER_STATE);
+    setLearner({ ...DEFAULT_LEARNER_STATE });
   }, []);
 
   return (
@@ -267,6 +317,7 @@ export const AcademyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         saveReflection,
         updateProjectProgress,
         loadDemoReviewItems,
+        clearDemoReviewItems,
         resetAllProgress,
       }}
     >

@@ -4,6 +4,7 @@ import { useAcademy } from '../context/AcademyContext';
 import { COURSES, SEMESTER_META } from '../data/curriculum';
 import { LESSONS, PROJECTS } from '../data/lessonsAndProjects';
 import { getCourseStatus } from '../state/learnerStore';
+import { getDueReviewAttempts } from '../engine/quizGrader';
 import { StatusBadge } from '../components/StatusBadge';
 
 export const DashboardPage: React.FC = () => {
@@ -14,7 +15,7 @@ export const DashboardPage: React.FC = () => {
   const pct = Math.round((completedCount / totalBlocks) * 100);
 
   const attemptList = Object.values(learner.attempts);
-  const dueList = attemptList.filter((a) => a.nextReviewAt <= Date.now());
+  const dueList = getDueReviewAttempts(learner.attempts);
   const project = PROJECTS[0];
   const projectProgress = learner.projects[project.slug];
   const completedDeliverables = projectProgress?.completedDeliverables.length ?? 0;

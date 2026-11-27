@@ -16,6 +16,7 @@ import { LESSONS, QUIZ_QUESTIONS } from '../data/lessonsAndProjects';
 import { ConceptDiagram } from '../components/ConceptDiagrams';
 import { SimulatedTerminal } from '../components/SimulatedTerminal';
 import { QuizCheckpoint } from '../components/QuizCheckpoint';
+import { NotFoundState } from '../components/NotFoundState';
 import { LessonBlock } from '../types/academy';
 
 export const LessonPlayerPage: React.FC<{ slug: string }> = ({ slug }) => {
@@ -29,18 +30,33 @@ export const LessonPlayerPage: React.FC<{ slug: string }> = ({ slug }) => {
     markLabCompleted,
   } = useAcademy();
 
-  const lesson = LESSONS[slug] ?? LESSONS['aib-100-linux-files-terminal'];
-  const completedIds = learner.completedBlockIds[lesson.slug] ?? [];
-  const initialIndex = Math.min(
-    lesson.blocks.length - 1,
-    learner.lastVisitedBlockIndex[lesson.slug] ?? 0
-  );
-  const [stepIndex, setStepIndex] = useState(initialIndex);
+  const lesson = LESSONS[slug];
+  const [stepIndex, setStepIndex] = useState(() => {
+    if (!lesson) return 0;
+    return Math.min(lesson.blocks.length - 1, learner.lastVisitedBlockIndex[lesson.slug] ?? 0);
+  });
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [predictionChoice, setPredictionChoice] = useState<number | null>(null);
   const [predictionSubmitted, setPredictionSubmitted] = useState(false);
-  const [reflectionText, setReflectionText] = useState(learner.reflections[lesson.slug] ?? '');
+  const [reflectionText, setReflectionText] = useState(() => (lesson ? learner.reflections[lesson.slug] ?? '' : ''));
   const [reflectionSaved, setReflectionSaved] = useState(false);
+
+  if (!lesson) {
+    return (
+      <NotFoundState
+        lang={lang}
+        titleAr="الدرس المطلوب غير موجود"
+        titleEn="Lesson Not Found"
+        descriptionAr={`لا يوجد درس بالمعرّف "${slug}" في المحتوى المتاح حالياً. يمكنك البدء بدرس AIB-100 أو استعراض خريطة المنهج.`}
+        descriptionEn={`No lesson matching "${slug}" exists in the current curriculum content.`}
+        primaryCtaPath="/lesson/aib-100-linux-files-terminal"
+        primaryCtaAr="افتح درس AIB-100 المتكامل"
+        primaryCtaEn="Open AIB-100 Lesson"
+      />
+    );
+  }
+
+  const completedIds = learner.completedBlockIds[lesson.slug] ?? [];
 
   const currentBlock: LessonBlock = lesson.blocks[stepIndex];
   const progressPct = Math.round((completedIds.length / lesson.blocks.length) * 100);

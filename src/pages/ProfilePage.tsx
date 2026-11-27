@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sun, Moon, Languages, Eye, Trash2, ShieldAlert } from 'lucide-react';
+import { Sun, Moon, Languages, Eye, Trash2, ShieldAlert, Download } from 'lucide-react';
 import { useAcademy } from '../context/AcademyContext';
 
 export const ProfilePage: React.FC = () => {
@@ -17,6 +17,16 @@ export const ProfilePage: React.FC = () => {
   const [resetDone, setResetDone] = useState(false);
 
   const completedBlocksTotal = Object.values(learner.completedBlockIds).reduce((a, b) => a + b.length, 0);
+
+  const handleExport = () => {
+    const blob = new Blob([JSON.stringify(learner, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ai-engineering-academy-progress-v${learner.schemaVersion}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <main className="mx-auto max-w-[820px] space-y-6 px-4 py-8 sm:px-6">
@@ -145,14 +155,19 @@ export const ProfilePage: React.FC = () => {
         </div>
       </section>
 
-      {/* Local Storage & Reset */}
+      {/* Local Storage, Export & Reset */}
       <section className="rounded-2xl border p-5" style={{ backgroundColor: 'var(--color-surface-1)', borderColor: 'var(--color-border)' }}>
         <div className="flex items-start gap-3">
           <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" style={{ color: 'var(--color-warning)' }} />
           <div className="flex-1">
-            <h2 className="text-base font-bold" style={{ color: 'var(--color-text-primary)' }}>
-              {lang === 'ar' ? 'بيانات التعلّم المحلية' : 'Local Prototype Storage'}
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-base font-bold" style={{ color: 'var(--color-text-primary)' }}>
+                {lang === 'ar' ? 'بيانات التعلّم المحلية' : 'Local Prototype Storage'}
+              </h2>
+              <span className="ltr-isolate font-mono text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                schema v{learner.schemaVersion}
+              </span>
+            </div>
             <p className="mt-1 text-xs sm:text-sm" style={{ color: 'var(--color-text-secondary)' }}>
               {lang === 'ar'
                 ? `خطوات مكتملة: ${completedBlocksTotal} • مختبرات: ${learner.completedLabs.length} • محاولات تحقق: ${Object.keys(learner.attempts).length}. لا يوجد خادم أو مزامنة سحابية في هذه النسخة.`
@@ -160,6 +175,16 @@ export const ProfilePage: React.FC = () => {
             </p>
 
             <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleExport}
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border px-4 text-xs font-semibold sm:text-sm"
+                style={{ backgroundColor: 'var(--color-surface-2)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+              >
+                <Download className="h-4 w-4" />
+                <span>{lang === 'ar' ? 'تصدير التقدم (JSON)' : 'Export Progress (JSON)'}</span>
+              </button>
+
               {!confirmReset ? (
                 <button
                   type="button"

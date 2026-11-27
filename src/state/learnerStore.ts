@@ -1,8 +1,16 @@
-import { LearnerState, AttemptRecord, Course, CourseStatus } from '../types/academy';
+import { LearnerState, Course, CourseEvaluation } from '../types/academy';
+import { COURSES } from '../data/curriculum';
+import { LESSONS, QUIZ_QUESTIONS } from '../data/lessonsAndProjects';
+import { evaluateCurriculumGraph } from '../engine/prerequisites';
+import { computeNextAttempt } from '../engine/quizGrader';
 
-const STORAGE_KEY = 'ai_eng_academy_state_v1';
+export { computeNextAttempt };
+
+export const STORAGE_KEY = 'ai_eng_academy_state_v1';
+export const CURRENT_SCHEMA_VERSION = 2;
 
 export const DEFAULT_LEARNER_STATE: LearnerState = {
+  schemaVersion: CURRENT_SCHEMA_VERSION,
   completedBlockIds: {},
   lastVisitedLessonSlug: 'aib-100-linux-files-terminal',
   lastVisitedBlockIndex: {},
@@ -13,29 +21,135 @@ export const DEFAULT_LEARNER_STATE: LearnerState = {
   demoReviewLoaded: false,
 };
 
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+/**
+ * Pure schema validator & migrator (v1 unversioned -> v2 versioned).
+ * Recovering gracefully from corrupted/partial JSON without crashing.
+ */
+export function parseAndMigrateLearnerState(raw: string | null): LearnerState {
+  if (!raw) return { ...DEFAULT_LEARNER_STATE };
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isPlainObject(parsed)) {
+      return { ...DEFAULT_LEARNER_STATE };
+    }
+
+    const completedBlockIds: Record<string, string[]> = {};
+    if (isPlainObject(parsed.completedBlockIds)) {
+      for (const [slug, ids] of Object.entries(parsed.completedBlockIds)) {
+        if (Array.isArray(ids)) {
+          completedBlockIds[slug] = ids.filter((x): x is string => typeof x === 'string');
+        }
+      }
+    }
+
+    const lastVisitedBlockIndex: Record<string, number> = {};
+    if (isPlainObject(parsed.lastVisitedBlockIndex)) {
+      for (const [slug, idx] of Object.entries(parsed.lastVisitedBlockIndex)) {
+        if (typeof idx === 'number' && Number.isFinite(idx) && idx >= 0) {
+          lastVisitedBlockIndex[slug] = Math.floor(idx);
+        }
+      }
+    }
+
+    const reflections: Record<string, string> = {};
+    if (isPlainObject(parsed.reflections)) {
+      for (const [slug, text] of Object.entries(parsed.reflections)) {
+        if (typeof text === 'string') reflections[slug] = text;
+      }
+    }
+
+    const attempts: LearnerState['attempts'] = {};
+    if (isPlainObject(parsed.attempts)) {
+      for (const [qid, rec] of Object.entries(parsed.attempts)) {
+        if (
+          isPlainObject(rec) &&
+          typeof rec.questionId === 'string' &&
+          (rec.correctness === 'correct' || rec.correctness === 'partial' || rec.correctness === 'incorrect') &&
+          typeof rec.timestamp === 'number' &&
+          typeof rec.nextReviewAt === 'number'
+        ) {
+          attempts[qid] = {
+            questionId: rec.questionId,
+            correctness: rec.correctness,
+            assessmentMode:
+              rec.assessmentMode === 'self_rubric' || rec.assessmentMode === 'objective'
+                ? rec.assessmentMode
+                : 'objective',
+            hintCount: typeof rec.hintCount === 'number' ? rec.hintCount : 0,
+            timestamp: rec.timestamp,
+            nextReviewAt: rec.nextReviewAt,
+            intervalDays: typeof rec.intervalDays === 'number' ? rec.intervalDays : 1,
+            isDemo: Boolean(rec.isDemo),
+          };
+        }
+      }
+    }
+
+    const completedLabs = Array.isArray(parsed.completedLabs)
+      ? parsed.completedLabs.filter((x): x is string => typeof x === 'string')
+      : [];
+
+    const projects: LearnerState['projects'] = {};
+    if (isPlainObject(parsed.projects)) {
+      for (const [slug, p] of Object.entries(parsed.projects)) {
+        if (isPlainObject(p)) {
+          projects[slug] = {
+            completedMilestones: Array.isArray(p.completedMilestones)
+              ? p.completedMilestones.filter((x): x is string => typeof x === 'string')
+              : [],
+            completedDeliverables: Array.isArray(p.completedDeliverables)
+              ? p.completedDeliverables.filter((x): x is string => typeof x === 'string')
+              : [],
+            artifactUrl: typeof p.artifactUrl === 'string' ? p.artifactUrl : '',
+            reflectionNote: typeof p.reflectionNote === 'string' ? p.reflectionNote : '',
+            submittedAt: typeof p.submittedAt === 'number' ? p.submittedAt : undefined,
+          };
+        }
+      }
+    }
+
+    return {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      completedBlockIds,
+      lastVisitedLessonSlug:
+        typeof parsed.lastVisitedLessonSlug === 'string'
+          ? parsed.lastVisitedLessonSlug
+          : DEFAULT_LEARNER_STATE.lastVisitedLessonSlug,
+      lastVisitedBlockIndex,
+      reflections,
+      attempts,
+      completedLabs,
+      projects,
+      demoReviewLoaded: Boolean(parsed.demoReviewLoaded),
+    };
+  } catch {
+    return { ...DEFAULT_LEARNER_STATE };
+  }
+}
+
 export function loadLearnerState(): LearnerState {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_LEARNER_STATE;
-    const parsed = JSON.parse(raw) as Partial<LearnerState>;
-    return {
-      ...DEFAULT_LEARNER_STATE,
-      ...parsed,
-      completedBlockIds: parsed.completedBlockIds ?? {},
-      lastVisitedBlockIndex: parsed.lastVisitedBlockIndex ?? {},
-      reflections: parsed.reflections ?? {},
-      attempts: parsed.attempts ?? {},
-      completedLabs: parsed.completedLabs ?? [],
-      projects: parsed.projects ?? {},
-    };
+    const migrated = parseAndMigrateLearnerState(raw);
+    if (raw && !raw.includes(`"schemaVersion":${CURRENT_SCHEMA_VERSION}`)) {
+      saveLearnerState(migrated);
+    }
+    return migrated;
   } catch {
-    return DEFAULT_LEARNER_STATE;
+    return { ...DEFAULT_LEARNER_STATE };
   }
 }
 
 export function saveLearnerState(state: LearnerState): void {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...state, schemaVersion: CURRENT_SCHEMA_VERSION })
+    );
   } catch {
     // Ignore storage quota errors gracefully
   }
@@ -49,65 +163,10 @@ export function clearLearnerState(): void {
   }
 }
 
-/**
- * Starter heuristic spaced-review scheduler (transparently labeled in UI, not claimed as scientific).
- */
-export function computeNextAttempt(
-  questionId: string,
-  correctness: 'correct' | 'partial' | 'incorrect',
-  hintCount: number,
-  prev?: AttemptRecord
-): AttemptRecord {
-  const now = Date.now();
-  let intervalDays = 1;
-  if (correctness === 'correct' && hintCount === 0) {
-    intervalDays = prev ? Math.min(14, Math.max(2, prev.intervalDays * 2)) : 3;
-  } else if (correctness === 'correct') {
-    intervalDays = 1;
-  } else {
-    intervalDays = 0; // Due immediately for review
-  }
-  return {
-    questionId,
-    correctness,
-    hintCount,
-    timestamp: now,
-    intervalDays,
-    nextReviewAt: now + intervalDays * 24 * 60 * 60 * 1000,
-    isDemo: false,
-  };
+export function evaluateAllCourses(state: LearnerState): Record<string, CourseEvaluation> {
+  return evaluateCurriculumGraph(COURSES, state, LESSONS, QUIZ_QUESTIONS);
 }
 
-export function getCourseStatus(course: Course, state: LearnerState): CourseStatus {
-  if (course.code === 'AIB-100') {
-    const completedBlocks = state.completedBlockIds['aib-100-linux-files-terminal'] ?? [];
-    const labDone = state.completedLabs.includes('linux-aib100');
-    const quizDone = state.attempts['q-aib100-pwd-vs-ls']?.correctness === 'correct';
-    if (completedBlocks.length >= 8 && labDone && quizDone) return 'mastered';
-    if (labDone || quizDone) return 'practiced';
-    if (completedBlocks.length > 0) return 'in_progress';
-    return 'available';
-  }
-  if (course.code === 'AIB-302') {
-    const completedBlocks = state.completedBlockIds['aib-302-rag-foundations'] ?? [];
-    const labDone = state.completedLabs.includes('rag-playground');
-    if (labDone && completedBlocks.length >= 2) return 'practiced';
-    if (completedBlocks.length > 0 || labDone) return 'in_progress';
-    return 'available';
-  }
-  if (course.code === 'AIB-303' && state.completedLabs.includes('agent-loop')) {
-    return 'practiced';
-  }
-  // Courses with unmet required prerequisites show prerequisite lock info cleanly,
-  // while AIB-110 has no required prerequisites.
-  if (course.prerequisitesRequired.length === 0) {
-    return 'not_started';
-  }
-  const aib100Mastered =
-    (state.completedBlockIds['aib-100-linux-files-terminal']?.length ?? 0) >= 5 ||
-    state.completedLabs.includes('linux-aib100');
-  if (course.prerequisitesRequired.includes('AIB-100') && aib100Mastered) {
-    return 'available';
-  }
-  return 'locked';
+export function getCourseStatus(course: Course, state: LearnerState) {
+  return evaluateAllCourses(state)[course.code]?.status ?? 'not_started';
 }

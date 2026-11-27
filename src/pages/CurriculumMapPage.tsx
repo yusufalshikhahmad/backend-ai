@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { List, LayoutGrid, ArrowLeft, ArrowRight, AlertTriangle, BookOpen, Terminal } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { List, LayoutGrid, ArrowLeft, ArrowRight, AlertTriangle, BookOpen, Terminal, Lock } from 'lucide-react';
 import { useAcademy } from '../context/AcademyContext';
 import { COURSES, SEMESTER_META } from '../data/curriculum';
-import { getCourseStatus } from '../state/learnerStore';
+import { evaluateAllCourses } from '../state/learnerStore';
 import { StatusBadge } from '../components/StatusBadge';
+import { NotFoundState } from '../components/NotFoundState';
 import { Course } from '../types/academy';
 
 export const CurriculumMapPage: React.FC<{ selectedSlug?: string }> = ({ selectedSlug }) => {
@@ -11,14 +12,32 @@ export const CurriculumMapPage: React.FC<{ selectedSlug?: string }> = ({ selecte
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
   const [openSemesters, setOpenSemesters] = useState<Record<number, boolean>>({ 1: true, 2: true, 3: true, 4: true });
 
+  const evaluations = useMemo(() => evaluateAllCourses(learner), [learner]);
+
   const selectedCourse: Course | undefined = selectedSlug
     ? COURSES.find((c) => c.slug === selectedSlug)
     : undefined;
 
   const ArrowIcon = lang === 'ar' ? ArrowLeft : ArrowRight;
 
+  if (selectedSlug && !selectedCourse) {
+    return (
+      <NotFoundState
+        lang={lang}
+        titleAr="المقرر المطلوب غير موجود"
+        titleEn="Course Not Found"
+        descriptionAr={`لم يتم العثور على مقرر بالمعرّف "${selectedSlug}" في خريطة المنهج الحالية.`}
+        descriptionEn={`No course matching "${selectedSlug}" was found in the current curriculum catalog.`}
+      />
+    );
+  }
+
   if (selectedCourse) {
-    const status = getCourseStatus(selectedCourse, learner);
+    const evalInfo = evaluations[selectedCourse.code];
+    const status = evalInfo?.status ?? 'not_started';
+    const missingReq = evalInfo?.missingRequiredPrereqs ?? [];
+    const missingRec = evalInfo?.missingRecommendedPrereqs ?? [];
+
     return (
       <main className="mx-auto max-w-[960px] space-y-6 px-4 py-8 sm:px-6">
         <button
@@ -36,7 +55,10 @@ export const CurriculumMapPage: React.FC<{ selectedSlug?: string }> = ({ selecte
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="ltr-isolate rounded-lg px-2.5 py-1 font-mono text-xs font-bold" style={{ backgroundColor: 'var(--color-surface-3)', color: 'var(--color-cyan)' }}>
+              <span
+                className="ltr-isolate rounded-lg px-2.5 py-1 font-mono text-xs font-bold"
+                style={{ backgroundColor: 'var(--color-surface-3)', color: 'var(--color-cyan)' }}
+              >
                 {selectedCourse.code}
               </span>
               <StatusBadge status={status} lang={lang} />
@@ -62,6 +84,36 @@ export const CurriculumMapPage: React.FC<{ selectedSlug?: string }> = ({ selecte
             {selectedCourse.purpose[lang]}
           </p>
 
+          {/* Locked prerequisite alert */}
+          {status === 'locked' && missingReq.length > 0 && (
+            <div
+              className="mt-4 flex items-start gap-2.5 rounded-xl border p-3.5 text-xs sm:text-sm"
+              style={{ backgroundColor: 'var(--color-warning-bg)', borderColor: 'var(--color-border-strong)' }}
+            >
+              <Lock className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--color-warning)' }} />
+              <div style={{ color: 'var(--color-text-primary)' }}>
+                <strong>{lang === 'ar' ? 'المتطلبات الإلزامية غير المكتملة: ' : 'Unmet required prerequisites: '}</strong>
+                <span className="ltr-isolate font-mono font-semibold">{missingReq.join(', ')}</span>
+                <p className="mt-1 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                  {lang === 'ar'
+                    ? 'يُفتح هذا المقرر تلقائياً بعد التمرّن أو إتقان المقررات المذكورة أعلاه.'
+                    : 'Unlocks automatically once you practice or master the required prerequisite course(s) above.'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {!evalInfo?.hasPublishedContent && (
+            <div
+              className="mt-4 rounded-xl border p-3.5 text-xs sm:text-sm"
+              style={{ backgroundColor: 'var(--color-surface-2)', borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+            >
+              {lang === 'ar'
+                ? 'محتوى الدروس التفصيلي لهذا المقرر قيد الإعداد (النسخة الحالية تركّز على إثبات AIB-100 ومعاينة AIB-302/AIB-303).'
+                : 'Detailed lesson blocks for this course are not published yet (current prototype focuses on AIB-100 plus AIB-302/AIB-303 previews).'}
+            </div>
+          )}
+
           {/* Prerequisites */}
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border p-3.5" style={{ backgroundColor: 'var(--color-surface-2)', borderColor: 'var(--color-border)' }}>
@@ -82,7 +134,9 @@ export const CurriculumMapPage: React.FC<{ selectedSlug?: string }> = ({ selecte
               </p>
               <p className="ltr-isolate mt-1 font-mono text-sm" style={{ color: 'var(--color-text-primary)' }}>
                 {selectedCourse.prerequisitesRecommended.length > 0
-                  ? selectedCourse.prerequisitesRecommended.join(', ')
+                  ? `${selectedCourse.prerequisitesRecommended.join(', ')}${
+                      missingRec.length > 0 ? (lang === 'ar' ? ' (غير مكتمل بعد)' : ' (not yet completed)') : ''
+                    }`
                   : '—'}
               </p>
             </div>
@@ -133,7 +187,7 @@ export const CurriculumMapPage: React.FC<{ selectedSlug?: string }> = ({ selecte
                     )}
                     {!mod.lessonSlug && !mod.labSlug && (
                       <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                        {lang === 'ar' ? 'مخطط قادم (قيد التحقق من المنهج)' : 'Planned (pending curriculum verification)'}
+                        {lang === 'ar' ? 'مخطط قادم (قيد الإعداد والتحقق)' : 'Planned (content pending)'}
                       </span>
                     )}
                   </div>
@@ -155,8 +209,8 @@ export const CurriculumMapPage: React.FC<{ selectedSlug?: string }> = ({ selecte
           </h1>
           <p className="mt-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
             {lang === 'ar'
-              ? '١٦ مقرراً موزعة على ٤ فصول. المقررات غير المدققة من ملف PDF تحمل وسم "بحاجة إلى مراجعة المصدر".'
-              : '16 courses across 4 semesters. Unverified titles/prerequisites are visibly labeled.'}
+              ? '١٦ مقرراً موزعة على ٤ فصول. المحتوى الفعلي الجاهز حالياً هو AIB-100 ومعاينة AIB-302 و AIB-303.'
+              : '16 catalog courses across 4 semesters. Active interactive lessons currently cover AIB-100 plus AIB-302/AIB-303 previews.'}
           </p>
         </div>
 
@@ -229,7 +283,8 @@ export const CurriculumMapPage: React.FC<{ selectedSlug?: string }> = ({ selecte
                 {isOpen && (
                   <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     {semCourses.map((course) => {
-                      const status = getCourseStatus(course, learner);
+                      const evalInfo = evaluations[course.code];
+                      const status = evalInfo?.status ?? 'not_started';
                       const isActiveFocus = course.code === 'AIB-100';
                       return (
                         <button
@@ -261,10 +316,15 @@ export const CurriculumMapPage: React.FC<{ selectedSlug?: string }> = ({ selecte
                           </div>
 
                           <div className="mt-4 space-y-1.5 pt-2">
-                            {course.prerequisitesRequired.length > 0 && (
+                            {evalInfo && evalInfo.missingRequiredPrereqs.length > 0 && (
+                              <p className="text-[11px]" style={{ color: 'var(--color-warning)' }}>
+                                {lang === 'ar' ? 'يتطلب: ' : 'Requires: '}
+                                <span className="ltr-isolate font-mono">{evalInfo.missingRequiredPrereqs.join(', ')}</span>
+                              </p>
+                            )}
+                            {!evalInfo?.hasPublishedContent && (
                               <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-                                {lang === 'ar' ? 'المتطلب: ' : 'Requires: '}
-                                <span className="ltr-isolate font-mono">{course.prerequisitesRequired.join(', ')}</span>
+                                {lang === 'ar' ? '• الدروس قيد الإعداد' : '• Lesson content pending'}
                               </p>
                             )}
                             {!course.verifiedSource && (
@@ -325,7 +385,7 @@ export const CurriculumMapPage: React.FC<{ selectedSlug?: string }> = ({ selecte
                     {course.prerequisitesRequired.join(', ') || '—'}
                   </td>
                   <td className="p-3.5">
-                    <StatusBadge status={getCourseStatus(course, learner)} lang={lang} />
+                    <StatusBadge status={evaluations[course.code]?.status ?? 'not_started'} lang={lang} />
                   </td>
                 </tr>
               ))}

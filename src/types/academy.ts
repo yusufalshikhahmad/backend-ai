@@ -99,13 +99,14 @@ export interface QuizQuestion {
   lessonId: string;
   courseCode: string;
   type: QuestionType;
+  assessmentMode?: 'objective' | 'self_rubric';
   difficulty: 'foundational' | 'applied' | 'architectural';
   skillTags: string[];
   sourceRef: string;
   prompt: LocalizedText;
   options?: LocalizedText[];
   correctIndices?: number[]; // For single_choice ([idx]) or multiple_select ([i1, i2]) or ordering (target index order)
-  rubricChecklist?: LocalizedText[]; // For short_answer self-rubric
+  rubricChecklist?: LocalizedText[]; // For short_answer self-rubric (never claimed as automated grading)
   hints: [LocalizedText, LocalizedText];
   explanation: LocalizedText;
   misconceptionNote: LocalizedText;
@@ -114,6 +115,7 @@ export interface QuizQuestion {
 export interface AttemptRecord {
   questionId: string;
   correctness: 'correct' | 'partial' | 'incorrect';
+  assessmentMode?: 'objective' | 'self_rubric';
   hintCount: number;
   timestamp: number;
   nextReviewAt: number;
@@ -149,6 +151,7 @@ export interface ProjectProgress {
 }
 
 export interface LearnerState {
+  schemaVersion: number;
   completedBlockIds: Record<string, string[]>; // lessonSlug -> blockIds
   lastVisitedLessonSlug: string;
   lastVisitedBlockIndex: Record<string, number>;
@@ -157,4 +160,11 @@ export interface LearnerState {
   completedLabs: string[];
   projects: Record<string, ProjectProgress>;
   demoReviewLoaded: boolean;
+}
+
+export interface CourseEvaluation {
+  status: CourseStatus;
+  missingRequiredPrereqs: string[];
+  missingRecommendedPrereqs: string[];
+  hasPublishedContent: boolean;
 }

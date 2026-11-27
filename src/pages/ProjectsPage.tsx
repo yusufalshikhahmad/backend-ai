@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FolderKanban, CheckCircle2, AlertTriangle, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useAcademy } from '../context/AcademyContext';
 import { PROJECTS } from '../data/lessonsAndProjects';
+import { NotFoundState } from '../components/NotFoundState';
 
 export const ProjectsPage: React.FC<{ selectedSlug?: string }> = ({ selectedSlug }) => {
   const { lang, navigate, learner, updateProjectProgress } = useAcademy();
@@ -9,6 +10,21 @@ export const ProjectsPage: React.FC<{ selectedSlug?: string }> = ({ selectedSlug
 
   const project = selectedSlug ? PROJECTS.find((p) => p.slug === selectedSlug) : undefined;
   const [savedBanner, setSavedBanner] = useState(false);
+
+  if (selectedSlug && !project) {
+    return (
+      <NotFoundState
+        lang={lang}
+        titleAr="المشروع المطلوب غير موجود"
+        titleEn="Project Not Found"
+        descriptionAr={`لا يوجد مشروع بالمعرّف "${selectedSlug}" في هذه النسخة.`}
+        descriptionEn={`No project workspace matching "${selectedSlug}" was found.`}
+        primaryCtaPath="/projects"
+        primaryCtaAr="استعرض المشاريع المتاحة"
+        primaryCtaEn="View Available Projects"
+      />
+    );
+  }
 
   if (project) {
     const progress = learner.projects[project.slug] ?? {

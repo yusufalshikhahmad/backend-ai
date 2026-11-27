@@ -1,38 +1,24 @@
 import React, { useState, useMemo } from 'react';
-import { Terminal, Search, Cpu, CheckCircle2, Play } from 'lucide-react';
+import { Terminal, Search, Cpu, CheckCircle2, Play, Target, AlertTriangle } from 'lucide-react';
 import { useAcademy } from '../context/AcademyContext';
 import { SimulatedTerminal } from '../components/SimulatedTerminal';
 import { ConceptDiagram } from '../components/ConceptDiagrams';
-
-const TOY_CORPUS = [
-  {
-    id: 'doc-fastapi-async',
-    source: 'fastapi_guide.md',
-    text: 'FastAPI uses async def endpoints on Uvicorn to handle concurrent I/O requests cleanly without blocking the event loop. Always set request timeouts when calling external LLM providers.',
-  },
-  {
-    id: 'doc-rag-overlap',
-    source: 'rag_chunking.md',
-    text: 'Chunk overlap (typically 10% to 20%) preserves semantic continuity across split boundaries. Without overlap, definitions split across two chunks may fail top-k retrieval.',
-  },
-  {
-    id: 'doc-linux-env',
-    source: 'linux_ops.md',
-    text: 'Store API credentials in .env outside Git and commit only .env.example. Verify working directory with pwd before launching systemd or Docker entrypoints.',
-  },
-];
+import { NotFoundState } from '../components/NotFoundState';
+import { TOY_RAG_CORPUS, chunkAndRetrieve } from '../engine/ragSim';
 
 export const LabPage: React.FC<{ slug: string }> = ({ slug }) => {
   const { lang, navigate, learner, markLabCompleted } = useAcademy();
 
   // RAG Playground state
-  const [chunkSize, setChunkSize] = useState(110);
-  const [overlap, setOverlap] = useState(20);
-  const [ragQuery, setRagQuery] = useState('chunk overlap retrieval');
+  const [chunkSize, setChunkSize] = useState(90);
+  const [overlap, setOverlap] = useState(0);
+  const [ragQuery, setRagQuery] = useState('boundaries top-k retrieval');
+  const [ragFeedback, setRagFeedback] = useState<'idle' | 'pass' | 'needs_overlap'>('idle');
 
   // Agent Loop state
   const [agentStep, setAgentStep] = useState(0);
   const [selectedTool, setSelectedTool] = useState<'search_docs' | 'run_shell' | 'read_metric'>('search_docs');
+  const [agentChallengeChoice, setAgentChallengeChoice] = useState<string | null>(null);
 
   const tabs = [
     { slug: 'linux-aib100', labelAr: 'مختبر Linux (AIB-100)', labelEn: 'Linux Terminal Lab', icon: Terminal },
@@ -40,31 +26,41 @@ export const LabPage: React.FC<{ slug: string }> = ({ slug }) => {
     { slug: 'agent-loop', labelAr: 'محاكاة حلقة الوكيل', labelEn: 'Agent Tool Loop', icon: Cpu },
   ];
 
-  const activeSlug = tabs.some((t) => t.slug === slug) ? slug : 'linux-aib100';
+  const validLab = tabs.some((t) => t.slug === slug);
 
-  const ragChunks = useMemo(() => {
-    const step = Math.max(30, chunkSize - overlap);
-    const out: { id: string; source: string; text: string; score: number }[] = [];
-    const terms = ragQuery
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((t) => t.length > 2);
+  const ragChunks = useMemo(
+    () => chunkAndRetrieve(TOY_RAG_CORPUS, chunkSize, overlap, ragQuery),
+    [chunkSize, overlap, ragQuery]
+  );
 
-    for (const doc of TOY_CORPUS) {
-      for (let start = 0, idx = 1; start < doc.text.length; start += step, idx++) {
-        const slice = doc.text.slice(start, start + chunkSize);
-        const lower = slice.toLowerCase();
-        const hits = terms.filter((t) => lower.includes(t)).length;
-        out.push({
-          id: `${doc.source}#c${idx}`,
-          source: doc.source,
-          text: slice,
-          score: hits,
-        });
-      }
+  if (!validLab) {
+    return (
+      <NotFoundState
+        lang={lang}
+        titleAr="المختبر المطلوب غير موجود"
+        titleEn="Lab Not Found"
+        descriptionAr={`لا يوجد مختبر تفاعلي بالمعرّف "${slug}". يمكنك تشغيل مختبر Linux الآمن أو ملعب RAG.`}
+        descriptionEn={`No interactive lab matching "${slug}" was found.`}
+        primaryCtaPath="/lab/linux-aib100"
+        primaryCtaAr="افتح مختبر Linux (AIB-100)"
+        primaryCtaEn="Open Linux Terminal Lab"
+      />
+    );
+  }
+
+  const verifyRagTask = () => {
+    const topTwoText = ragChunks
+      .slice(0, 2)
+      .map((c) => c.text.toLowerCase())
+      .join(' ');
+    const hasOverlapBridge = overlap >= 15 && topTwoText.includes('boundaries') && topTwoText.includes('top-k');
+    if (hasOverlapBridge) {
+      setRagFeedback('pass');
+      markLabCompleted('rag-playground');
+    } else {
+      setRagFeedback('needs_overlap');
     }
-    return out.sort((a, b) => b.score - a.score);
-  }, [chunkSize, overlap, ragQuery]);
+  };
 
   const agentTrace = [
     {
@@ -88,8 +84,14 @@ export const LabPage: React.FC<{ slug: string }> = ({ slug }) => {
     {
       titleAr: '٣. إرجاع النتيجة المسندة',
       titleEn: '3. Grounded Observation & Response',
-      detailAr: 'يتلقى الوكيل المخرج المهيكل ويصوغ إجابة مرتبطة بدليل الأداة.',
-      detailEn: 'Agent ingests structured tool output and emits a cited final answer.',
+      detailAr:
+        selectedTool === 'run_shell'
+          ? 'فشل التنفيذ غير المصرح به — يعود الوكيل إلى بديل آمن أو يطلب صلاحية محدودة.'
+          : 'يتلقى الوكيل المخرج المهيكل ويصوغ إجابة مرتبطة بدليل الأداة.',
+      detailEn:
+        selectedTool === 'run_shell'
+          ? 'Execution denied — agent falls back to read-only inspection or safe refusal.'
+          : 'Agent ingests structured tool output and emits a cited final answer.',
     },
   ];
 
@@ -110,7 +112,7 @@ export const LabPage: React.FC<{ slug: string }> = ({ slug }) => {
         <div className="flex flex-wrap gap-2">
           {tabs.map((tab) => {
             const Icon = tab.icon;
-            const active = activeSlug === tab.slug;
+            const active = slug === tab.slug;
             const done = learner.completedLabs.includes(tab.slug);
             return (
               <button
@@ -134,7 +136,7 @@ export const LabPage: React.FC<{ slug: string }> = ({ slug }) => {
       </div>
 
       {/* Lab 1: Linux Simulator */}
-      {activeSlug === 'linux-aib100' && (
+      {slug === 'linux-aib100' && (
         <section className="space-y-4">
           <div className="rounded-2xl border p-5" style={{ backgroundColor: 'var(--color-surface-1)', borderColor: 'var(--color-border)' }}>
             <h2 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>
@@ -163,19 +165,38 @@ export const LabPage: React.FC<{ slug: string }> = ({ slug }) => {
         </section>
       )}
 
-      {/* Lab 2: RAG Playground */}
-      {activeSlug === 'rag-playground' && (
+      {/* Lab 2: RAG Playground with Guided Task & Feedback */}
+      {slug === 'rag-playground' && (
         <section className="space-y-5">
           <ConceptDiagram id="rag-flow" lang={lang} />
+
+          {/* Guided Task Banner */}
+          <div className="rounded-2xl border p-4 sm:p-5" style={{ backgroundColor: 'var(--color-surface-1)', borderColor: 'var(--color-border-strong)' }}>
+            <div className="flex items-start gap-2.5">
+              <Target className="mt-0.5 h-5 w-5 shrink-0" style={{ color: 'var(--color-cyan)' }} />
+              <div className="space-y-1">
+                <h2 className="text-sm font-bold sm:text-base" style={{ color: 'var(--color-text-primary)' }}>
+                  {lang === 'ar'
+                    ? 'مهمة المختبر: منع انقطاع السياق بين المقاطع (Boundary Loss)'
+                    : 'Lab Goal: Prevent Boundary Context Loss'}
+                </h2>
+                <p className="text-xs sm:text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                  {lang === 'ar'
+                    ? 'حالياً التداخل (Overlap) مضبوط على 0 حرف. اضبط التداخل إلى 15 حرفاً على الأقل واضغط "تحقق من جودة الاسترجاع" لتلاحظ كيف تبقى كلمتا boundaries و top-k مترابطتين في أعلى النتائج.'
+                    : 'Overlap starts at 0 chars. Increase overlap to at least 15 chars and click Verify Retrieval so both "boundaries" and "top-k" stay linked in the top 2 results.'}
+                </p>
+              </div>
+            </div>
+          </div>
 
           <div className="grid gap-5 rounded-2xl border p-5 lg:grid-cols-12" style={{ backgroundColor: 'var(--color-surface-1)', borderColor: 'var(--color-border)' }}>
             <div className="space-y-4 lg:col-span-5">
               <div className="flex items-center justify-between">
-                <h2 className="text-base font-bold" style={{ color: 'var(--color-text-primary)' }}>
+                <h3 className="text-base font-bold" style={{ color: 'var(--color-text-primary)' }}>
                   {lang === 'ar' ? 'ضبط معاملات التقطيع والاسترجاع' : 'Chunking & Query Controls'}
-                </h2>
+                </h3>
                 <span className="text-[11px]" style={{ color: 'var(--color-warning)' }}>
-                  {lang === 'ar' ? 'محاكاة تعليمية (Toy Corpus)' : 'Toy corpus simulation'}
+                  {lang === 'ar' ? 'محاكاة حتمية (Keyword-based toy corpus)' : 'Keyword toy corpus (not vector embeddings)'}
                 </span>
               </div>
 
@@ -190,7 +211,10 @@ export const LabPage: React.FC<{ slug: string }> = ({ slug }) => {
                   max={180}
                   step={10}
                   value={chunkSize}
-                  onChange={(e) => setChunkSize(Number(e.target.value))}
+                  onChange={(e) => {
+                    setChunkSize(Number(e.target.value));
+                    setRagFeedback('idle');
+                  }}
                   className="w-full"
                 />
               </div>
@@ -206,20 +230,26 @@ export const LabPage: React.FC<{ slug: string }> = ({ slug }) => {
                   max={50}
                   step={5}
                   value={overlap}
-                  onChange={(e) => setOverlap(Number(e.target.value))}
+                  onChange={(e) => {
+                    setOverlap(Number(e.target.value));
+                    setRagFeedback('idle');
+                  }}
                   className="w-full"
                 />
               </div>
 
               <div>
                 <label htmlFor="rag-query" className="mb-1 block text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-                  {lang === 'ar' ? 'استعلام الاختبار (بالإنجليزية لتطابق الوثائق التجريبية):' : 'Test retrieval query:'}
+                  {lang === 'ar' ? 'استعلام الاختبار:' : 'Test retrieval query:'}
                 </label>
                 <input
                   id="rag-query"
                   type="text"
                   value={ragQuery}
-                  onChange={(e) => setRagQuery(e.target.value)}
+                  onChange={(e) => {
+                    setRagQuery(e.target.value);
+                    setRagFeedback('idle');
+                  }}
                   className="ltr-isolate w-full rounded-xl border px-3 py-2 font-mono text-xs sm:text-sm"
                   style={{ backgroundColor: 'var(--color-surface-2)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
                 />
@@ -227,13 +257,34 @@ export const LabPage: React.FC<{ slug: string }> = ({ slug }) => {
 
               <button
                 type="button"
-                onClick={() => markLabCompleted('rag-playground')}
+                onClick={verifyRagTask}
                 className="inline-flex min-h-[44px] items-center gap-2 rounded-full px-5 text-xs font-bold sm:text-sm"
                 style={{ backgroundColor: 'var(--color-action-primary)', color: 'var(--color-action-primary-fg)' }}
               >
                 <CheckCircle2 className="h-4 w-4" />
-                <span>{lang === 'ar' ? 'تسجيل إتمام تجربة RAG' : 'Mark RAG Lab Practiced'}</span>
+                <span>{lang === 'ar' ? 'تحقق من جودة الاسترجاع' : 'Verify Retrieval Task'}</span>
               </button>
+
+              {ragFeedback === 'pass' && (
+                <div role="status" className="rounded-xl border p-3 text-xs" style={{ backgroundColor: 'var(--color-success-bg)', borderColor: 'var(--color-border-strong)', color: 'var(--color-text-primary)' }}>
+                  <strong style={{ color: 'var(--color-success)' }}>
+                    {lang === 'ar' ? 'نجحت التجربة! ' : 'Task Passed! '}
+                  </strong>
+                  {lang === 'ar'
+                    ? 'حافظ التداخل على استمرارية السياق عبر حدود المقاطع وتم تسجيل إتمام مختبر RAG.'
+                    : 'Overlap preserved boundary continuity across chunks, and RAG Lab completion was logged.'}
+                </div>
+              )}
+              {ragFeedback === 'needs_overlap' && (
+                <div role="status" className="rounded-xl border p-3 text-xs" style={{ backgroundColor: 'var(--color-warning-bg)', borderColor: 'var(--color-border-strong)', color: 'var(--color-text-primary)' }}>
+                  <strong style={{ color: 'var(--color-warning)' }}>
+                    {lang === 'ar' ? 'لم يتحقق الشرط بعد: ' : 'Not verified yet: '}
+                  </strong>
+                  {lang === 'ar'
+                    ? 'ارفع التداخل (Overlap) إلى 15 حرفاً على الأقل وتأكد أن الاستعلام يبحث عن boundaries top-k retrieval.'
+                    : 'Increase Overlap to at least 15 chars and query for "boundaries top-k retrieval".'}
+                </div>
+              )}
             </div>
 
             <div className="space-y-3 lg:col-span-7">
@@ -266,8 +317,8 @@ export const LabPage: React.FC<{ slug: string }> = ({ slug }) => {
         </section>
       )}
 
-      {/* Lab 3: Agent Tool Loop */}
-      {activeSlug === 'agent-loop' && (
+      {/* Lab 3: Agent Tool Loop with Policy Decision Check */}
+      {slug === 'agent-loop' && (
         <section className="space-y-5">
           <ConceptDiagram id="agent-loop" lang={lang} />
 
@@ -277,8 +328,8 @@ export const LabPage: React.FC<{ slug: string }> = ({ slug }) => {
             </h2>
             <p className="mt-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
               {lang === 'ar'
-                ? 'اختر الأداة التي سيطلبها الوكيل، ثم تتبع كيف تفحص طبقة الحماية الطلب قبل التنفيذ.'
-                : 'Select a tool call candidate and step through the policy guardrail trace.'}
+                ? 'اختر الأداة التي سيطلبها الوكيل، شغّل خطوات التتبع، ثم حدّد القرار الأمني الصحيح لأداة run_shell().'
+                : 'Select a tool call candidate, step through the trace, then answer the guardrail check for run_shell().'}
             </p>
 
             <div className="mt-4 flex flex-wrap gap-2">
@@ -326,14 +377,10 @@ export const LabPage: React.FC<{ slug: string }> = ({ slug }) => {
               })}
             </div>
 
-            <div className="mt-5 flex flex-wrap gap-3">
+            <div className="mt-5 flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                onClick={() => {
-                  const next = Math.min(2, agentStep + 1);
-                  setAgentStep(next);
-                  if (next === 2) markLabCompleted('agent-loop');
-                }}
+                onClick={() => setAgentStep((s) => Math.min(2, s + 1))}
                 className="brand-gradient-bg inline-flex min-h-[44px] items-center gap-2 rounded-full px-6 text-xs font-bold text-[#07111D] sm:text-sm"
               >
                 <Play className="h-4 w-4" />
@@ -343,10 +390,70 @@ export const LabPage: React.FC<{ slug: string }> = ({ slug }) => {
                       ? 'تنفيذ الخطوة التالية'
                       : 'Advance Trace Step'
                     : lang === 'ar'
-                      ? 'اكتمل التتبع'
+                      ? 'اكتملت المعاينة'
                       : 'Trace Complete'}
                 </span>
               </button>
+            </div>
+
+            {/* Policy verification question */}
+            <div className="mt-6 border-t pt-5" style={{ borderColor: 'var(--color-border)' }}>
+              <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
+                {lang === 'ar'
+                  ? 'سؤال التحقق لإتمام المختبر: ماذا يجب أن تفعل طبقة الحماية عندما يطلب الوكيل run_shell("rm -rf /")؟'
+                  : 'Verification check: What should the policy guardrail do if an agent requests run_shell("rm -rf /")?'}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[
+                  {
+                    id: 'allow',
+                    ar: 'السماح بالتنفيذ المباشر على الخادم',
+                    en: 'Allow direct execution on host server',
+                  },
+                  {
+                    id: 'block',
+                    ar: 'رفض الأمر لعدم وجوده في Allowlist أو عزله في Sandbox',
+                    en: 'Reject outside allowlist or enforce isolated sandbox',
+                  },
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => {
+                      setAgentChallengeChoice(opt.id);
+                      if (opt.id === 'block') markLabCompleted('agent-loop');
+                    }}
+                    className="min-h-[42px] rounded-xl border px-4 text-xs font-semibold sm:text-sm"
+                    style={{
+                      backgroundColor: agentChallengeChoice === opt.id ? 'var(--color-surface-3)' : 'var(--color-surface-2)',
+                      borderColor: agentChallengeChoice === opt.id ? 'var(--color-cyan)' : 'var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                    }}
+                  >
+                    {lang === 'ar' ? opt.ar : opt.en}
+                  </button>
+                ))}
+              </div>
+              {agentChallengeChoice === 'block' && (
+                <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--color-success)' }}>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>
+                    {lang === 'ar'
+                      ? 'صحيح! لا ننفذ أوامر وكيل عشوائية على الخادم الرئيسي أبداً.'
+                      : 'Correct! Never execute arbitrary agent shell commands on the main API/host.'}
+                  </span>
+                </p>
+              )}
+              {agentChallengeChoice === 'allow' && (
+                <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--color-error)' }}>
+                  <AlertTriangle className="h-4 w-4" />
+                  <span>
+                    {lang === 'ar'
+                      ? 'خطر أمني! قد يؤدي Prompt Injection إلى تدمير الخادم أو تسريب الأسرار.'
+                      : 'Security risk! Prompt injection could compromise the host or exfiltrate secrets.'}
+                  </span>
+                </p>
+              )}
             </div>
           </div>
         </section>

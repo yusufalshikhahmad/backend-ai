@@ -78,7 +78,7 @@ export const Navbar: React.FC = () => {
             AE
           </span>
           <span className="flex flex-col">
-            <span className="ltr-isolate text-sm font-bold tracking-tight sm:text-base" style={{ color: 'var(--color-text-primary)' }}>
+            <span className="ltr-isolate whitespace-nowrap text-xs font-bold tracking-tight sm:text-base" style={{ color: 'var(--color-text-primary)' }}>
               AI Engineering Academy
             </span>
           </span>

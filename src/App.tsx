@@ -1,6 +1,8 @@
 import React from 'react';
 import { AcademyProvider, useAcademy } from './context/AcademyContext';
 import { Navbar } from './components/Navbar';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { NotFoundState } from './components/NotFoundState';
 import { HomePage } from './pages/HomePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { CurriculumMapPage } from './pages/CurriculumMapPage';
@@ -11,68 +13,74 @@ import { ProjectsPage } from './pages/ProjectsPage';
 import { ProfilePage } from './pages/ProfilePage';
 
 const AppRouter: React.FC = () => {
-  const { route, lang, navigate } = useAcademy();
+  const { route, lang } = useAcademy();
 
   const renderPage = () => {
-    if (route === '/' || route === '') {
+    const cleanRoute = route.length > 1 && route.endsWith('/') ? route.slice(0, -1) : route;
+
+    if (cleanRoute === '/' || cleanRoute === '') {
       return <HomePage />;
     }
-    if (route === '/dashboard') {
+    if (cleanRoute === '/dashboard') {
       return <DashboardPage />;
     }
-    if (route === '/learn') {
+    if (cleanRoute === '/learn') {
       return <CurriculumMapPage />;
     }
-    if (route.startsWith('/course/')) {
-      const slug = route.replace('/course/', '').split('/')[0];
-      return <CurriculumMapPage selectedSlug={slug} />;
+    if (cleanRoute.startsWith('/course/')) {
+      const slug = cleanRoute.slice('/course/'.length);
+      if (slug && !slug.includes('/')) {
+        return <CurriculumMapPage selectedSlug={slug} />;
+      }
     }
-    if (route.startsWith('/lesson/')) {
-      const slug = route.replace('/lesson/', '').split('/')[0];
-      return <LessonPlayerPage slug={slug} />;
+    if (cleanRoute.startsWith('/lesson/')) {
+      const slug = cleanRoute.slice('/lesson/'.length);
+      if (slug && !slug.includes('/')) {
+        return <LessonPlayerPage slug={slug} />;
+      }
     }
-    if (route.startsWith('/lab/')) {
-      const slug = route.replace('/lab/', '').split('/')[0];
-      return <LabPage slug={slug} />;
+    if (cleanRoute.startsWith('/lab/')) {
+      const slug = cleanRoute.slice('/lab/'.length);
+      if (slug && !slug.includes('/')) {
+        return <LabPage slug={slug} />;
+      }
     }
-    if (route === '/review') {
+    if (cleanRoute === '/review') {
       return <ReviewPage />;
     }
-    if (route === '/projects') {
+    if (cleanRoute === '/projects') {
       return <ProjectsPage />;
     }
-    if (route.startsWith('/projects/')) {
-      const slug = route.replace('/projects/', '').split('/')[0];
-      return <ProjectsPage selectedSlug={slug} />;
+    if (cleanRoute.startsWith('/projects/')) {
+      const slug = cleanRoute.slice('/projects/'.length);
+      if (slug && !slug.includes('/')) {
+        return <ProjectsPage selectedSlug={slug} />;
+      }
     }
-    if (route === '/profile') {
+    if (cleanRoute === '/profile') {
       return <ProfilePage />;
     }
 
     return (
-      <main className="mx-auto max-w-[680px] px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
-          {lang === 'ar' ? 'الصفحة غير موجودة' : 'Route Not Found'}
-        </h1>
-        <p className="mt-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-          {lang === 'ar' ? 'المسار المطلوب غير متاح في هذه النسخة الأولية.' : 'The requested route is not available in this prototype.'}
-        </p>
-        <button
-          type="button"
-          onClick={() => navigate('/')}
-          className="mt-6 inline-flex min-h-[44px] items-center rounded-full px-6 text-sm font-bold"
-          style={{ backgroundColor: 'var(--color-action-primary)', color: 'var(--color-action-primary-fg)' }}
-        >
-          {lang === 'ar' ? 'العودة إلى الرئيسية' : 'Return Home'}
-        </button>
-      </main>
+      <NotFoundState
+        lang={lang}
+        titleAr="الصفحة المطلوبة غير موجودة"
+        titleEn="Page Not Found"
+        descriptionAr={`المسار "${route}" غير متاح في هذه النسخة الأولية (Prototype 0.1).`}
+        descriptionEn={`The route "${route}" does not exist in this prototype.`}
+        primaryCtaPath="/"
+        primaryCtaAr="العودة إلى الرئيسية"
+        primaryCtaEn="Return Home"
+      />
     );
   };
 
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
-      <div className="flex-1">{renderPage()}</div>
+      <ErrorBoundary>
+        <div className="flex-1">{renderPage()}</div>
+      </ErrorBoundary>
       <footer
         className="border-t px-4 py-5 text-center text-xs"
         style={{
@@ -82,7 +90,7 @@ const AppRouter: React.FC = () => {
         }}
       >
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-2 px-2">
-          <span className="ltr-isolate font-mono">AI Engineering Academy • Interactive Prototype</span>
+          <span className="ltr-isolate font-mono">AI Engineering Academy • Prototype 0.1 (Stage 1 Stabilized)</span>
           <span>
             {lang === 'ar'
               ? 'الطرفية والتقدّم يعملان محلياً في المتصفح (Safe Sandbox & localStorage)'
